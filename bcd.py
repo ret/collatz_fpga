@@ -6,16 +6,16 @@ from nmigen.back import pysim, verilog
 class CMAG(Elaboratable):
     def __init__(self):
         # i_mag goes from 0 to 9, corresponding to 1,10,100,...,1000000000
-        self.i_mag = Signal(max=9)
-        self.o1 = Signal(max=9999999999) # 34 bits
-        self.o2 = Signal(max=9999999999)
-        self.o3 = Signal(max=9999999999)
-        self.o4 = Signal(max=9999999999)
-        self.o5 = Signal(max=9999999999)
-        self.o6 = Signal(max=9999999999)
-        self.o7 = Signal(max=9999999999)
-        self.o8 = Signal(max=9999999999)
-        self.o9 = Signal(max=9999999999)
+        self.i_mag = Signal(len(Const(9)))
+        self.o1 = Signal(len(Const(9999999999))) # 34 bits
+        self.o2 = Signal(len(Const(9999999999)))
+        self.o3 = Signal(len(Const(9999999999)))
+        self.o4 = Signal(len(Const(9999999999)))
+        self.o5 = Signal(len(Const(9999999999)))
+        self.o6 = Signal(len(Const(9999999999)))
+        self.o7 = Signal(len(Const(9999999999)))
+        self.o8 = Signal(len(Const(9999999999)))
+        self.o9 = Signal(len(Const(9999999999)))
 
     def elaborate(self, platform):
         m = Module()
@@ -104,10 +104,10 @@ class CMAG(Elaboratable):
 
 class BCD1_32(Elaboratable):
     def __init__(self):
-        self.mag     = Signal(max=1000000000)
-        self.i_val   = Signal(max=9999999999, reset=8192)
-        self.o_digit = Signal(max=9)
-        self.o_rem   = Signal(max=9999999999)
+        self.mag     = Signal(len(Const(1000000000)))
+        self.i_val   = Signal(len(Const(9999999999)), reset=8192)
+        self.o_digit = Signal(len(Const(9)))
+        self.o_rem   = Signal(len(Const(9999999999)))
         # internal
         self.cmag    = CMAG()
 
@@ -150,8 +150,8 @@ if __name__ == "__main__":
         def bcd_proc():
             yield
             n = 9111222333
-            (nbits,_) = Signal(max=n).shape()
-            print(Signal(max=n).shape()) # 34 bits
+            nbits = len(Const(n))
+            print(len(Const(n))) # 34 bits
             yield bcd.mag.eq(9) # 1000000000
             yield bcd.i_val.eq(Signal(nbits, reset=n))
             yield

@@ -119,7 +119,7 @@ class Collatz(Elaboratable):
                 # check for risk of overflow, self.x needs to be at least a
                 # factor of 4 below max(self.x.nbits, i.e. xwidth),
                 # i.e. most significant two bits of self.x not set!
-                with m.If( (self.x[self.x.nbits-1] == 0) & (self.x[self.x.nbits-2] == 0) ):
+                with m.If( (self.x[self.x.width-1] == 0) & (self.x[self.x.width-2] == 0) ):
                     m.d.comb += [
                         # TODO: write this as <<1 (shr), set lsb, +self.x
                         self.next_x.eq( (3*self.x + 1) >> 1),

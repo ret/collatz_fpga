@@ -8,7 +8,7 @@ from bcd import BCD1_32
 
 import argparse
 
-(maxn,_) = Signal(max=9999999999).shape() # single digit billions, needs 34 bits
+maxn = len(Const(9999999999)) # single digit billions, needs 34 bits
 
 class Hex8Decoder(Elaboratable):
     def __init__(self):
@@ -79,18 +79,18 @@ class UART_Printer(Elaboratable):
 
         m.submodules.inputfifo = self.inputfifo
         m.d.comb += [
-            self.inputfifo.we.eq(self.we),
-            self.inputfifo.din.eq(self.din),
-            self.writable.eq(self.inputfifo.writable)
+            self.inputfifo.w_en.eq(self.we),
+            self.inputfifo.w_data.eq(self.din),
+            self.writable.eq(self.inputfifo.w_rdy)
         ]
         with m.FSM(reset='READY') as fsm:
             with m.State('READY'):
-                with m.If( (self.inputfifo.readable) & (self.uartfifo.writable) ):
+                with m.If( (self.inputfifo.r_rdy) & (self.uartfifo.w_rdy) ):
                     m.d.comb += [
                         # cmd are the high order bits
-                        Cat(self.data, self.cmd).eq(self.inputfifo.dout), #s
+                        Cat(self.data, self.cmd).eq(self.inputfifo.r_data), #s
                         # remove input element
-                        self.inputfifo.re.eq(1),
+                        self.inputfifo.r_en.eq(1),
                     ]
                     m.d.sync += [
                         self.nonlead0.eq(0),
@@ -132,173 +132,173 @@ class UART_Printer(Elaboratable):
             # VERBATIM (ascii printing)
             # LSB printed first, 0s are skipped
             with m.State('V_1'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     with m.If( (self.va > 0)):
                         m.d.comb += [
-                            self.uartfifo.din.eq(self.va),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.va),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'V_2'
             with m.State('V_2'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     with m.If( (self.vb > 0)):
                         m.d.comb += [
-                            self.uartfifo.din.eq(self.vb),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.vb),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'V_3'
             with m.State('V_3'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     with m.If( (self.vc > 0)):
                         m.d.comb += [
-                            self.uartfifo.din.eq(self.vc),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.vc),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'V_4'
             with m.State('V_4'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     with m.If( (self.vd > 0)):
                         m.d.comb += [
-                            self.uartfifo.din.eq(self.vd),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.vd),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'READY'
 
             # DECIMAL + SPACE
             with m.State('D_1'):
                 # o_j is highest digit
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(8),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_2'
             with m.State('D_2'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(7),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_3'
             with m.State('D_3'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(6),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_4'
             with m.State('D_4'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(5),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_5'
             with m.State('D_5'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(4),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_6'
             with m.State('D_6'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(3),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_7'
             with m.State('D_7'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(2),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_8'
             with m.State('D_8'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(1),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)
                         ]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_9'
             with m.State('D_9'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         self.bcd1.mag.eq(0),
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)]
                         m.d.sync += [
                             self.nonlead0.eq(1)
                         ]
                     m.next = 'D_10'
             with m.State('D_10'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.sync += [
                         ##### self.bcd1.mag.eq(0), # 10^0, 1..9
                         self.bcd1.i_val.eq(self.bcd1.o_rem)
                     ]
                     with m.If( (self.bcd1.o_digit > 0) | (self.nonlead0 == 1) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)
                         ]
                         m.d.sync += [
                             self.nonlead0.eq(1)
@@ -307,103 +307,103 @@ class UART_Printer(Elaboratable):
                     # 0 as well. Print 0
                     with m.If( (self.bcd1.o_digit == 0) | (self.nonlead0 == 0) ):
                         m.d.comb += [
-                            self.uartfifo.din.eq(48 + self.bcd1.o_digit),
-                            self.uartfifo.we.eq(1)
+                            self.uartfifo.w_data.eq(48 + self.bcd1.o_digit),
+                            self.uartfifo.w_en.eq(1)
                         ]
                     m.next = 'SPACE'
 
             # HEX 32 bit + SPACE
             with m.State('H32_1a'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_1.o_upper),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_1.o_upper),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'H32_1b'
             with m.State('H32_1b'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_1.o_lower),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_1.o_lower),
+                            self.uartfifo.w_en.eq(1)]
                     with m.If(self.h_spaceout):
                         m.next = 'H32_2a_space'
                     with m.Else():
                         m.next = 'H32_2a'
 
             with m.State('H32_2a_space'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
                         # write gap
-                        self.uartfifo.din.eq(32), # SPACE
-                        self.uartfifo.we.eq(1)
+                        self.uartfifo.w_data.eq(32), # SPACE
+                        self.uartfifo.w_en.eq(1)
                     ]
                     m.next = 'H32_2a'
             with m.State('H32_2a'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_2.o_upper),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_2.o_upper),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'H32_2b'
             with m.State('H32_2b'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_2.o_lower),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_2.o_lower),
+                            self.uartfifo.w_en.eq(1)]
                     with m.If(self.h_spaceout):
                         m.next = 'H32_3a_space'
                     with m.Else():
                         m.next = 'H32_3a'
 
             with m.State('H32_3a_space'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
                         # write gap
-                        self.uartfifo.din.eq(32), # SPACE
-                        self.uartfifo.we.eq(1)
+                        self.uartfifo.w_data.eq(32), # SPACE
+                        self.uartfifo.w_en.eq(1)
                     ]
                     m.next = 'H32_3a'
             with m.State('H32_3a'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_3.o_upper),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_3.o_upper),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'H32_3b'
             with m.State('H32_3b'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_3.o_lower),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_3.o_lower),
+                            self.uartfifo.w_en.eq(1)]
                     with m.If(self.h_spaceout):
                         m.next = 'H32_4a_space'
                     with m.Else():
                         m.next = 'H32_4a'
 
             with m.State('H32_4a_space'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
                         # write gap
-                        self.uartfifo.din.eq(32), # SPACE
-                        self.uartfifo.we.eq(1)
+                        self.uartfifo.w_data.eq(32), # SPACE
+                        self.uartfifo.w_en.eq(1)
                     ]
                     m.next = 'H32_4a'
             with m.State('H32_4a'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_4.o_upper),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_4.o_upper),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'H32_4b'
             with m.State('H32_4b'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
-                            self.uartfifo.din.eq(self.h8d_4.o_lower),
-                            self.uartfifo.we.eq(1)]
+                            self.uartfifo.w_data.eq(self.h8d_4.o_lower),
+                            self.uartfifo.w_en.eq(1)]
                     m.next = 'SPACE'
 
             with m.State('SPACE'):
-                with m.If(self.uartfifo.writable):
+                with m.If(self.uartfifo.w_rdy):
                     m.d.comb += [
                         # write gap
-                        self.uartfifo.din.eq(32), # SPACE
-                        self.uartfifo.we.eq(1)
+                        self.uartfifo.w_data.eq(32), # SPACE
+                        self.uartfifo.w_en.eq(1)
                     ]
                     m.next = 'READY'
         return m

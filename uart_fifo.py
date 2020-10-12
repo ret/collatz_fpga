@@ -53,13 +53,13 @@ class UART_FIFO(Elaboratable):
             ]
         m.d.comb += [
             # r_fifo, rd port
-            self.r_fifo_readable.eq(self.r_fifo.readable),
-            self.r_fifo_re.eq(self.r_fifo.re),
-            self.r_fifo_dout.eq(self.r_fifo.dout),
+            self.r_fifo_readable.eq(self.r_fifo.r_rdy),
+            self.r_fifo_re.eq(self.r_fifo.r_en),
+            self.r_fifo_dout.eq(self.r_fifo.r_data),
             # w_fifo, wr port
-            self.w_fifo_writable.eq(self.w_fifo.writable),
-            self.w_fifo_we.eq(self.w_fifo.we),
-            self.w_fifo_din.eq(self.w_fifo.din)
+            self.w_fifo_writable.eq(self.w_fifo.w_rdy),
+            self.w_fifo_we.eq(self.w_fifo.w_en),
+            self.w_fifo_din.eq(self.w_fifo.w_data)
         ]
         # host to device loop
         with m.FSM(reset='AWAIT_UART_DATA') as fsm_rd_from_host:
@@ -70,19 +70,19 @@ class UART_FIFO(Elaboratable):
                 # Use SW flow control (send XOFF/XON)
                 # See https://pyserial.readthedocs.io/en/latest/pyserial_api.html
                 # and https://en.wikipedia.org/wiki/Software_flow_control
-                with m.If(self.uart.rx_rdy & self.r_fifo.writable):
+                with m.If(self.uart.rx_rdy & self.r_fifo.w_rdy):
                     m.d.comb += [
-                        self.r_fifo.din.eq(self.uart.rx_data),
-                        self.r_fifo.we.eq(1)
+                        self.r_fifo.w_data.eq(self.uart.rx_data),
+                        self.r_fifo.w_en.eq(1)
                     ]
                     m.next = 'AWAIT_UART_DATA' # LOOP
         # device to host loop
         with m.FSM(reset='AWAIT_FIFO_DATA') as fsm_wr_to_host:
             with m.State('AWAIT_FIFO_DATA'):
                 # checks to see if uart is ready to transmit data
-                with m.If(self.w_fifo.readable & ~self.uart.tx_active):
+                with m.If(self.w_fifo.r_rdy & ~self.uart.tx_active):
                     m.d.comb += [
-                        self.uart.tx_data.eq(self.w_fifo.dout),
+                        self.uart.tx_data.eq(self.w_fifo.r_data),
                         self.uart.tx_rdy.eq(1),
                     ]
                     # not needed in sim since we're reading from
@@ -90,12 +90,12 @@ class UART_FIFO(Elaboratable):
                     if platform:
                         m.d.comb += [
                             # rd fifo (dequeue element)
-                            self.w_fifo.re.eq(1)
+                            self.w_fifo.r_en.eq(1)
                         ]
                     if self.sim_tx_cycle_accurate:
                         m.d.comb += [
                             # rd fifo (dequeue element)
-                            self.w_fifo.re.eq(1)
+                            self.w_fifo.r_en.eq(1)
                         ]
                     m.next = 'AWAIT_FIFO_DATA_COMPLETE'
             with m.State('AWAIT_FIFO_DATA_COMPLETE'):
